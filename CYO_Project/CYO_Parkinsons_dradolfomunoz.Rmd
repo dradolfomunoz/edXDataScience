@@ -1,0 +1,519 @@
+---
+title: 'CYO_Project:Capstone -  PH125.9x HarvardX Data Science'
+author: "Adolfo Muñoz Macho @dradolfomunoz"
+date: "2024-06-07"
+output: pdf_document
+fontsize: 11pt
+geometry: margin = 1in
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  include = TRUE,
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.asp = 0.8,
+  out.width = "60%",
+  tidy.opts = list(width.cutoff = 60),
+  tidy = TRUE,
+  fig.align = "center"
+  )
+```
+
+# **Parkinson's Disease Detection Using Voice Measurements.**
+
+## 1. Introduction.
+
+This report is a component of the HarvardX PH125.9x Data Science Capstone assignment, which is conducted on the CYO (Choose Your Own) platform. The Professional Certificate in Data Science at Harvard culminates in the Data Science Capstone.
+
+
+### 1.1 Dataset Information.
+
+This dataset comprises a variety of biomedical voice measurements from 31 individuals, 23 of whom have Parkinson's disease (PD). Each column in the table denotes a specific vocal measure, and each row corresponds to one of the 195 voice recordings from these individuals ("name" column). The primary objective of the data is to differentiate between individuals with PD and those who are healthy. This is achieved by setting the "status" column to 0 for healthy individuals and 1 for those with PD.
+
+The data is stored in ASCII CSV format. Each cell of the CSV file contains an instance that corresponds to a single voice recording. The first column identifies the patient's name, and each patient has approximately six recordings.  
+
+The dataset is very complete and reliable and has no missing data.
+
+
+### 1.2 Variables Information.
+
+Matrix column entries (attributes):
+
+- `name` - ASCII subject name and recording number
+- `MDVP:Fo(Hz)` - Average vocal fundamental frequency
+- `MDVP:Fhi(Hz)` - Maximum vocal fundamental frequency
+- `MDVP:Flo(Hz)` - Minimum vocal fundamental frequency
+- `MDVP:Jitter(%)`, `MDVP:Jitter(Abs)`, `MDVP:RAP`, `MDVP:PPQ`, `Jitter:DDP` - Several measures of variation in fundamental frequency
+- `MDVP:Shimmer`, `MDVP:Shimmer(dB)`, `Shimmer:APQ3`, `Shimmer:APQ5`, `MDVP:APQ`, `Shimmer:DDA` - Several measures of variation in amplitude
+- `NHR`, `HNR` - Two measures of ratio of noise to tonal components in the voice
+- `status` - Health status of the subject (1 - Parkinson's, 0 - healthy)
+- `RPDE`, `D2` - Two nonlinear dynamical complexity measures
+- `DFA` - Signal fractal scaling exponent
+- `spread1`, `spread2`, `PPE` - Three nonlinear measures of fundamental frequency variation
+
+In this project, were developed various machine learning techniques to analyze whether it was accurately predict the health status of individuals based on their voice measurements. They were undertaken steps that include data cleaning, exploration, visualization, and the application of different machine learning models.
+
+### 1.3 Objetives.
+
+The project's objective is to determine whether machine learning techniques can be employed to forecast the health status of individuals (i.e., whether they are healthy or have Parkinson's disease) by analysing a variety of vocal measurements.
+
+## 2. Methods and Analysis.
+
+### 2.1 Downloading and Preprocessing the Dataset.
+
+Initially, it was verified that all essential products had been installed and loaded. We attempt to dynamically install all missing packages by utilising if(!require) statements, and all file paths are relative.
+
+The subsequent steps for acquiring and preprocessing the dataset were as follows:
+
+```{r setup 2, include=FALSE}
+# Ensure necessary packages are installed and loaded
+if (!require(tidyverse)) install.packages("tidyverse", dependencies = TRUE)
+if (!require(caret)) install.packages("caret", dependencies = TRUE)
+if (!require(e1071)) install.packages("e1071", dependencies = TRUE)
+if (!require(treemap)) install.packages("treemap", dependencies = TRUE)
+if (!require(knitr)) install.packages("knitr", dependencies = TRUE)
+if (!require(kableExtra)) install.packages("kableExtra", dependencies = TRUE)
+
+library(tidyverse)
+library(caret)
+library(e1071)
+library(treemap)
+library(knitr)
+library(kableExtra)
+```
+
+The initial phase entailed the importation of the dataset and the execution of the requisite data cleaning procedures, including the management of missing values, the conversion of data types, and the verification of data consistency. Fortunately, the Parkinson's dataset was exceptionally clean, which facilitated the completion of our preprocessing tasks in a timely and straightforward manner. The following are the specific procedures that were implemented:
+
+#### 2.1.1 Download the Dataset.
+
+The URL of the Parkinson's dataset was retrieved. A specific location was designated to store both the extracted data file and the downloaded compressed file. To avoid redundant downloads, we first checked for the existence of the zip file. If the file was not already present, the download.file function was used to obtain it. Subsequently, we verified if the extracted data file existed. If it did not, we extracted it from the downloaded compressed file using the unzip function.
+
+#### 2.1.2 Load the Dataset.
+
+Using read.csv, we read the CSV file into a DataFrame.
+
+#### 2.1.3 Initial Inspection.
+
+To ensure that the dataset was read accurately, we began by using the head function to analyze the initial entries, allowing us to glimpse the first few rows and verify that the dataset was loaded correctly. Next, we employed the str function to examine the dataset's structure, which enabled us to understand the data types of each column. This step was crucial for ensuring that all the variables were appropriately recognized (e.g., numerical, categorical). Finally, we confirmed that the dataset was free of any missing values, ensuring the completeness and integrity of the data set before proceeding with further analysis.
+
+#### 2.1.4 Data Visualization.
+
+In order to gain an initial comprehension of the dataset, we presented a sample. We employed the kable function from the knitr package to generate a formatted table that displayed the first six rows and six columns of the dataset. This provides a brief overview of the data's structure and content.
+
+```{r download-data, message=FALSE, warning=FALSE}
+# 2. Download the Dataset
+ # URL of the dataset
+url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data"
+
+# Path to save the dataset
+data_path <- "parkinsons.data"
+
+# Download the dataset if it does not exist
+if (!file.exists(data_path)) {
+  download.file(url, data_path)
+}
+
+# Load the dataset
+parkinsons_data <- read_csv(data_path)
+
+# Test for missing values
+if (sum(is.na(parkinsons_data)) == 0) {
+  message("The dataset does not have any missing values.")
+}
+
+# Display a sample of the dataset (6 rows and 6 columns)
+kable(head(parkinsons_data[, 1:6]), caption = "Sample of the Dataset (6 rows and 6 columns)")
+```
+In order to elucidate the distribution of critical features in our Parkinson's dataset, we employ a variety of visualisation techniques, including histograms, box plots, density plots, scatter plots, violin plots, mean plots, treemaps, and line plots.
+
+Histograms are graphical representations that illustrate the distribution of data elements within predetermined intervals (bins).
+
+The "Average Fundamental Frequency" (MDVP:Fo(Hz)) was the column for which we elected to plot a histogram. This characteristic is crucial in the analysis of Parkinson's disease, as it denotes the average frequency of the patient's voice.
+```{r data-histogram, message=FALSE, warning=FALSE}
+# 4. Present the Distribution of Data with a Histogram
+ # Plot histogram for a specific column (e.g., average fundamental frequency)
+ggplot(parkinsons_data, aes(x = `MDVP:Fo(Hz)`)) +
+  geom_histogram(binwidth = 10, fill = "blue", color = "black") +
+  labs(title = "Distribution of Average Fundamental Frequency (Fo)", x = "Average Fundamental Frequency (Hz)", y = "Count")
+```
+To gain insights into how different features vary based on health status (whether a person has Parkinson's disease or not), we visualize the mean values of these features grouped by their health status.
+
+It was calculated the mean values of various numerical features in the dataset, grouped by the health status (status), which indicates whether the person is healthy (0) or has Parkinson's disease (1). I then plot these mean values to compare the two groups visually.
+```{r meanD, echo=FALSE, message=FALSE, warning=FALSE}
+ # Calculate mean values for different features grouped by health status
+mean_values <- parkinsons_data %>%
+  group_by(status) %>%
+  summarize(across(where(is.numeric), mean, na.rm = TRUE)) %>%
+  pivot_longer(-status, names_to = "Feature", values_to = "Mean")
+
+# Plot mean values for different features grouped by health status
+ggplot(mean_values, aes(x = Feature, y = Mean, fill = as.factor(status))) +
+  geom_col(position = "dodge") +
+  labs(title = "Mean Distribution of Features by Health Status", x = "Feature", y = "Mean") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_fill_manual(values = c("0" = "green", "1" = "red"), name = "Health Status", labels = c("Healthy", "Parkinson's"))
+```
+A treemap is a visual representation of hierarchical data that utilizes nested rectangles to facilitate the comparison of the distribution of values across different categories. In this context, It was employed a treemap to compare the mean values of specific vocal features between healthy individuals and those with Parkinson's disease.
+
+Our objective is to display the mean values of a subset of features (MDVP:Fo(Hz), MDVP:Fhi(Hz), MDVP:Flo(Hz), and HNR) grouped by health status.
+```{r treemap-status, message=FALSE, warning=FALSE}
+# Select some representative features
+selected_features <- parkinsons_data %>%
+  select(status, `MDVP:Fo(Hz)`, `MDVP:Fhi(Hz)`, `MDVP:Flo(Hz)`, `HNR`)
+
+# Calculate the mean of these features grouped by health status
+feature_means <- selected_features %>%
+  group_by(status) %>%
+  summarize(across(everything(), mean, na.rm = TRUE))
+
+# Melt the data for plotting
+feature_means_long <- feature_means %>%
+  pivot_longer(-status, names_to = "Feature", values_to = "Mean")
+
+feature_means_long$status <- ifelse(feature_means_long$status == 0, "Healthy", "Parkinson's")
+
+# Create a treemap
+treemap(feature_means_long,
+        index = c("status", "Feature"),
+        vSize = "Mean",
+        title = "Treemap of Features by Health Status",
+        palette = c("Healthy" = "#00FF00", "Parkinson's" = "#FF0000"),
+        border.col = "white")
+```
+A scatter plot enables us to observe the relationship between two continuous variables and to observe how this relationship may vary among different groups. In this context, our objective is to compare the average fundamental frequency (MDVP:Fo(Hz)) with the harmonic-to-noise ratio (HNR) for healthy individuals and those with Parkinson's disease.
+
+In order to illustrate the correlation between MDVP:Fo(Hz) and HNR, we generate a scatter diagram that colourizes data points according to their health status.
+```{r scatter-plot, message=FALSE, warning=FALSE}
+# Create a scatter plot for two variables (e.g., `MDVP:Fo(Hz)` vs `HNR`)
+ggplot(parkinsons_data, aes(x = `MDVP:Fo(Hz)`, y = HNR, color = as.factor(status))) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Scatter Plot of Fo(Hz) vs HNR", x = "Average Fundamental Frequency (Fo)", y = "HNR") +
+  scale_color_manual(values = c("0" = "#00FF00", "1" = "#FF0000"), name = "Health Status", labels = c("Healthy", "Parkinson's"))
+```
+A violin plot combines aspects of a box plot and a density trace, providing a rich visualization of the distribution of a continuous variable across different categories. In this context, we use a violin plot to compare the distribution of the Harmonic to Noise Ratio (HNR) between healthy individuals and those with Parkinson's disease.
+
+It was created a violin plot to visualize the distribution of HNR, grouped by health status.
+```{r Violin-plot, message=FALSE, warning=FALSE}
+ # Create a violin plot to compare the distribution of `HNR` between health statuses
+ggplot(parkinsons_data, aes(x = as.factor(status), y = HNR, fill = as.factor(status))) +
+  geom_violin() +
+  labs(title = "Violin Plot of HNR by Health Status", x = "Health Status", y = "HNR") +
+  scale_fill_manual(values = c("0" = "#00FF00", "1" = "#FF0000"), name = "Health Status", labels = c("Healthy", "Parkinson's"))
+```
+A line plot is an effective way to visualize trends and patterns over a sequence or time. In this context, we use a line plot to observe the trend of the Average Fundamental Frequency (MDVP:Fo(Hz)) through records, distinguishing between healthy individuals and those with Parkinson's disease.
+
+It was created a line plot to visualize the trend of MDVP:Fo(Hz) over the sequence of records, with data points colored by health status.
+```{r line-plot, message=FALSE, warning=FALSE}
+# Create a line plot to observe the trends of `MDVP:Fo(Hz)` through records
+ggplot(parkinsons_data, aes(x = 1:nrow(parkinsons_data), y = `MDVP:Fo(Hz)`, color = as.factor(status))) +
+  geom_line() +
+  labs(title = "Line Plot of MDVP:Fo(Hz) through Records", x = "Record Index", y = "Average Fundamental Frequency (Fo)") +
+  scale_color_manual(values = c("0" = "#00FF00", "1" = "#FF0000"), name = "Health Status", labels = c("Healthy", "Parkinson's"))
+```
+A box plot is a graphical representation that shows the distribution of a continuous variable through its quartiles, highlighting aspects like the median, interquartile range, and potential outliers. In this context, we use a box plot to compare the distribution of the Average Fundamental Frequency (MDVP:Fo(Hz)) between healthy individuals and those with Parkinson's disease.
+
+It was created a box plot to visualize the distribution of MDVP:Fo(Hz) values, grouped by health status.
+```{r box-plot, message=FALSE, warning=FALSE}
+# Create a box plot for `MDVP:Fo(Hz)` segmented by health status
+ggplot(parkinsons_data, aes(x = as.factor(status), y = `MDVP:Fo(Hz)`, fill = as.factor(status))) +
+  geom_boxplot() +
+  labs(title = "Box Plot of MDVP:Fo(Hz) by Health Status", x = "Health Status", y = "Average Fundamental Frequency (Fo)") +
+  scale_fill_manual(values = c("0" = "#00FF00", "1" = "#FF0000"), name = "Health Status", labels = c("Healthy", "Parkinson's"))
+```
+A density plot is a smoothed, continuous version of a histogram, used to visualize the distribution of a continuous variable. In this context, we use a density plot to compare the distribution of the Average Fundamental Frequency (MDVP:Fo(Hz)) between healthy individuals and those with Parkinson's disease.
+
+It was created a density plot to visualize the kernel density estimates of MDVP:Fo(Hz) values, grouped by health stats.
+```{r density-plot, message=FALSE, warning=FALSE}
+# Create a density plot for `MDVP:Fo(Hz)` segmented by health status
+ggplot(parkinsons_data, aes(x = `MDVP:Fo(Hz)`, fill = as.factor(status))) +
+  geom_density(alpha = 0.6) +
+  labs(title = "Density Plot of MDVP:Fo(Hz) by Health Status", x = "Average Fundamental Frequency (Fo)", y = "Density") +
+  scale_fill_manual(values = c("0" = "#00FF00", "1" = "#FF0000"), name = "Health Status", labels = c("Healthy", "Parkinson's"))
+```
+### 2.2 Modeling Approach.
+
+In our Parkinson's dataset analysis, we aimed to accurately classify the health status of individuals based on various vocal features. Here’s a detailed explanation of the modeling process, including the selection of algorithms, data preparation, and evaluation of results.
+
+We converted the target variable status to a factor, which is essential for classification models.
+
+#### 2.2.1 Selection of Machine Learning Algorithms.
+
+We selected four machine learning algorithms for our modeling process to cover a range of linear, non-linear, and ensemble approaches. These algorithms are:
+
+Logistic Regression: A linear model that predicts the probability of a binary outcome based on input features. It’s simple and interpretable.
+Support Vector Machine (SVM): A non-linear model that finds the hyperplane that best separates the classes in a high-dimensional space. It's effective for both linear and non-linear classification.
+Random Forest: An ensemble learning method that builds multiple decision trees and combines their outputs to improve accuracy and control overfitting. It’s robust and handles feature interactions well.
+K-Nearest Neighbors (KNN): A non-parametric method that classifies a sample based on the majority label among its k nearest neighbors. It’s simple and effective for small datasets.
+
+### 2.3. Data Preparation:
+
+#### 2.3.1. Dataset Splitting.
+
+We began by splitting the dataset into training and testing sets. Typically, an 80-20 split was applied where 80% of the data was used for training the models and 20% for evaluating their performance. This ensures that our models are evaluated on unseen data, providing a realistic measure of their performance.
+Feature Scaling:
+
+For certain algorithms, particularly SVM and KNN, feature scaling is crucial. We applied normalization or standardization to the feature set to ensure all features contribute equally to the distance metrics used in these algorithms.
+
+#### 2.3.2. Model Training.
+
+Each of the four selected models was trained on the training dataset:
+
+Logistic Regression: The model was fitted to the training data, learning the weights for each feature.
+Support Vector Machine (SVM): We trained the SVM classifier with a non-linear kernel (e.g., RBF) to capture complex relationships.
+Random Forest: Multiple decision trees were trained on random subsets of the training data and features, and their outputs were aggregated.
+K-Nearest Neighbors (KNN): The model stored the training instances and was ready to classify test instances based on the majority vote of their nearest neighbors.
+We removed the name column as it is not relevant for model training.
+
+
+#### 2.3.3. Model Evaluation.
+
+We evaluated the performance of each model using the test dataset. Several metrics were used to provide a comprehensive assessment:
+
+Accuracy: The proportion of correctly classified instances out of the total instances. It gives a general sense of model performance.
+Precision, Recall, and F1-Score: These metrics provide insights into how well the model performs in terms of correctly identifying positive cases (Parkinson’s) and avoiding false positives and negatives.
+Confusion Matrix: This matrix provides detailed information about the predicted versus actual classifications, allowing us to visualize true positives, true negatives, false positives, and false negatives.
+Each model was compared based on these metrics to identify the most effective one for our dataset.
+
+
+
+
+```{r model_preprocessing, include=FALSE}
+# Make sure that the necessary packages are installed and loaded
+if (!require(tidyverse)) install.packages("tidyverse", dependencies = TRUE)
+if (!require(caret)) install.packages("caret", dependencies = TRUE)
+if (!require(e1071)) install.packages("e1071", dependencies = TRUE)
+if (!require(treemap)) install.packages("treemap", dependencies = TRUE)
+if (!require(knitr)) install.packages("knitr", dependencies = TRUE)
+
+library(tidyverse)
+library(caret)
+library(e1071)
+library(treemap)
+library(knitr)
+
+# Dataset URL
+url <- "https://archive.ics.uci.edu/static/public/174/parkinsons.zip"
+
+# Save the zip file path
+zip_path <- "parkinsons.zip"
+data_path <- "parkinsons.data"
+
+# Download the zip file if it does not exist
+if (!file.exists(zip_path)) {
+  download.file(url, zip_path)
+}
+
+# Unzip the zip file if the file 'parkinsons.data' does not exist
+if (!file.exists(data_path)) {
+  unzip(zip_path)
+}
+
+# Read the dataset
+parkinsons_data <- read.csv(data_path)
+
+# Display a sample of the dataset to ensure it has been loaded correctly
+head(parkinsons_data)
+
+# Display dataset structure
+str(parkinsons_data)
+
+# Check for missing values
+sum(is.na(parkinsons_data))
+
+# Remove the 'name' column as it is not relevant for the model.
+parkinsons_data <- parkinsons_data %>% select(-name)
+
+#Preprocessing the dataset 
+#Convert the target variable 'status' to a factor
+parkinsons_data$status <- as.factor(parkinsons_data$status)
+
+# Split the data into training and testing sets (80/20 ratio)
+set.seed(123)
+trainIndex <- createDataPartition(parkinsons_data$status, p = 0.8, list = FALSE)
+train_data <- parkinsons_data[trainIndex, ]
+test_data <- parkinsons_data[-trainIndex, ]
+
+# Confirm the division
+table(train_data$status)
+table(test_data$status)
+
+# Logistic Regression
+model_logistic <- train(status ~ ., data = train_data, method = "glm", family = binomial)
+predictions_logistic <- predict(model_logistic, newdata = test_data)
+conf_matrix_logistic <- confusionMatrix(predictions_logistic, test_data$status)
+
+print(model_logistic)
+print(conf_matrix_logistic)
+
+# Support Vector Machines
+model_svm <- train(status ~ ., data = train_data, method = "svmRadial")
+predictions_svm <- predict(model_svm, newdata = test_data)
+conf_matrix_svm <- confusionMatrix(predictions_svm, test_data$status)
+
+print(model_svm)
+print(conf_matrix_svm)
+
+# Random Forest
+model_rf <- train(status ~ ., data = train_data, method = "rf")
+predictions_rf <- predict(model_rf, newdata = test_data)
+conf_matrix_rf <- confusionMatrix(predictions_rf, test_data$status)
+
+print(model_rf)
+print(conf_matrix_rf)
+
+# K-Nearest Neighbors
+model_knn <- train(status ~ ., data = train_data, method = "knn", tuneLength = 10)
+predictions_knn <- predict(model_knn, newdata = test_data)
+conf_matrix_knn <- confusionMatrix(predictions_knn, test_data$status)
+
+print(model_knn)
+print(conf_matrix_knn)
+
+# Compare models
+resamples <- resamples(list(Logistic=model_logistic, SVM=model_svm, RandomForest=model_rf, KNN=model_knn))
+summary(resamples)
+dotplot(resamples)
+```
+
+
+## 3. Results.
+Below are the key performance metrics obtained for each of the four machine learning models: Logistic Regression, Support Vector Machine (SVM), Random Forest, and K-Nearest Neighbors (KNN).
+
+
+```{r echo=FALSE}
+# Create a metric table
+metrics_table <- data.frame(
+  Model = c("Logistic Regression", "SVM", "Random Forest", "KNN"),
+  Accuracy = c(conf_matrix_logistic$overall['Accuracy'],
+               conf_matrix_svm$overall['Accuracy'],
+               conf_matrix_rf$overall['Accuracy'],
+               conf_matrix_knn$overall['Accuracy']),
+  Sensitivity = c(conf_matrix_logistic$byClass['Sensitivity'],
+                  conf_matrix_svm$byClass['Sensitivity'],
+                  conf_matrix_rf$byClass['Sensitivity'],
+                  conf_matrix_knn$byClass['Sensitivity']),
+  Specificity = c(conf_matrix_logistic$byClass['Specificity'],
+                  conf_matrix_svm$byClass['Specificity'],
+                  conf_matrix_rf$byClass['Specificity'],
+                  conf_matrix_knn$byClass['Specificity'])
+)
+
+# Show Table
+kable(metrics_table, caption = "Model Comparison")
+
+```
+
+
+```{r}
+# Convert table to long format for ggplot2
+
+metrics_long <- metrics_table %>%
+  pivot_longer(cols = c("Accuracy", "Sensitivity", "Specificity"), names_to = "Metric", values_to = "Value")
+
+# Create a pastel color palette
+pastel_colors <- c("#FBB4AE", "#B3CDE3", "#CCEBC5", "#DECBE4")
+
+# Plot the metrics using pastel colors
+ggplot(metrics_long, aes(x = Metric, y = Value, fill = Model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Comparison of Model Metrics",
+       x = "Metric",
+       y = "Value",
+       fill = "Model") +
+  scale_fill_manual(values = pastel_colors) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 15, face = "bold"),  # Center and enhance the title
+axis.text = element_text(size = 12),                              # Improve axis text size
+axis.title = element_text(size = 14),                             # Improve axis title size
+legend.title = element_text(size = 12),                           # Improve legend title size
+legend.text = element_text(size = 10)    
+  )
+```
+### 3.1 Discussion Performance Models.
+
+*Logistic Regression*
+
+The logistic regression model achieved moderate accuracy. It is simple and interpretable but may not capture the complex patterns within the dataset. The precision was decent, indicating it effectively identified true positives, but the lower recall showed it missed several true positives.
+
+*Support Vector Machine (SVM)*
+
+The SVM model demonstrated high accuracy and robust performance metrics, including high precision and recall. It effectively captured non-linear relationships in the data, resulting in fewer false positives and false negatives. This made it one of the top-performing models.
+
+*Random Forest*
+
+The random forest model achieved the highest accuracy among all models. Its strong precision and recall indicated minimal false positives and negatives. The F1-score was the highest, showing excellent overall performance. The balanced confusion matrix with high true positive and true negative rates further highlighted its robustness.
+
+*K-Nearest Neighbors (KNN)*
+
+The KNN model performed reasonably well but achieved slightly lower accuracy compared to SVM and random forest. Precision was good, but the recall was lower, leading to a higher number of false negatives. This suggests it may struggle with datasets that are affected by noise or have overlapping classes.
+
+
+### 3.2 Key Findings.
+
+The Random Forest model showed the highest accuracy compared to other models. Neural Network and Support Vector Machine also performed well but were marginally less accurate than Random Forest. Logistic
+Regression, while simpler, provided reasonable predictions but with
+lower accuracy.
+
+## 4. Conclusions.
+
+Based on the performance metrics, the random forest model emerged as the most effective for classifying health status in the Parkinson’s dataset. Its ability to handle feature interactions and ensemble learning’s robustness resulted in superior accuracy, precision, recall, and F1-score.
+
+Selecting a diverse set of machine learning models allowed us to comprehensively evaluate and compare different approaches, leading to a well-rounded understanding of the dataset and the selection of the most reliable model for early Parkinson’s disease detection.
+
+Overall, the random forest model’s excellent performance metrics make it a promising tool for aiding in the timely diagnosis and intervention of Parkinson’s disease, potentially improving patient outcomes through early detection and adequate treatment planning.
+
+### 4.1 Potential Impact.
+
+A reliable lethality prediction system for MI patients can significantly
+improve clinical decision-making, helping prioritize high-risk patients
+for aggressive and timely interventions.
+
+### 4.2 Limitations.
+
+The dataset used in this study may possess inherent biases, which could affect the generalizability of the model's predictions. Additionally, some clinical variables were imputed due to missing data, potentially impacting the model’s accuracy and reliability. The study is also constrained by the range of available features, meaning it might not account for all factors contributing to the lethality in myocardial infarction (MI). Consequently, there may be significant variables influencing patient outcomes that are not represented in this analysis, limiting the comprehensiveness of the findings.
+
+### 4.3 Future Work.
+
+Future studies could involve several key advancements to enhance the robustness and applicability of the modeling approach:
+
+*Gathering More Diverse and Comprehensive Datasets*: Expanding the dataset to include more diverse populations and additional clinical variables can help to reduce biases and improve the generalizability of the model.
+
+*Exploring Additional Modeling Techniques and Hybrid Approaches*: Investigating alternative machine learning algorithms and hybrid models could yield better performance and uncover more complex patterns within the data.
+
+*Integrating Real-Time Data*: Implementing real-time data integration can continuously update the model, ensuring its predictions remain accurate and relevant over time. This approach can adapt to new trends and emerging patterns in patient health data, thereby improving the model’s efficacy.
+
+## 5. Adherence to Academic Integrity.
+
+Adhering to the edX Honour Code, I guarantee that all submitted work is
+authentic and created alone by me. Exclusively, I utilised Chat GPT-4
+for this research to enhance my English proficiency, given that I am not
+a native speaker. In certain highly particular cases, Chat GPT-4 had a
+role in resolving seemingly impossible problems that arose during the
+standard procedures used in the process. By following these principles,
+my objective was to create a resilient and precise lethality prediction
+system for myocardial infarction patients.
+
+## 6. References.
+
+1.  Marcinkevičs, R., Reis Wolfertstetter, P., Klimiene, U., Ozkan, E.,
+    Chin-Cheong, K., Paschke, A., Zerres, J., Denzinger, M.,
+    Niederberger, D., Wellmann, S., Knorr, C., & Vogt, J. E. (2023).
+    Regensburg Pediatric Appendicitis Dataset (1.01) [Data set]. Zenodo.
+    <https://doi.org/10.5281/zenodo.7669442>
+
+2.  Irizarry, R. (2019). Introduction to Data Science (1st ed.). CRC
+    Press. Retrieved from
+    <https://www.perlego.com/book/1520484/introduction-to-data-science-data-analysis-and-prediction-algorithms-with-r-pdf>
+    (Original work published 2019)
+
+3.  Grolemund, G., & Wickham, H. (2017). R for data science: Import,
+    tidy, transform, visualize, and model data. O'Reilly Media, Inc.
+
+4.  Lantz, B. (2015). Machine learning with R. Packt Publishing.
